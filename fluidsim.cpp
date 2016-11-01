@@ -44,9 +44,10 @@ void FluidSim::initialize(float width, int ni_, int nj_) {
    //surface.reset_phi(circle_phi, dx, Vec2f(0.5*dx,0.5*dx), ni, nj);
    
    rigidgeom = new Box2DGeometry(0.2f, 0.2f);
-   rbd = new RigidBody(1, *rigidgeom);
-   rbd->setCOM(Vec2f(0.5f, 0.7f));
+   rbd = new RigidBody(10.0, *rigidgeom);
+   rbd->setCOM(Vec2f(0.5f, 0.6f));
    rbd->setAngularMomentum(0.0f);
+   rbd->setLinearVelocity(Vec2f(0, 0));
 }
 
 //Initialize the grid-based signed distance field that dictates the position of the solid boundary
@@ -443,7 +444,9 @@ void FluidSim::compute_phi() {
                liquid_phi(i,j) = -0.5f*dx;
          }
       }
-   }  
+   } 
+
+   liquid_phi.assign(-1);
 }
 
 
@@ -543,7 +546,6 @@ void FluidSim::compute_viscosity_weights() {
 
 //An implementation of the variational pressure projection solve for static geometry
 void FluidSim::solve_pressure(float dt) {
-   
    
    // Assemble the data for the J vectors
    Array2d base_trans_x(ni, nj), base_trans_y(ni, nj), base_rot_z(ni, nj);
@@ -678,24 +680,24 @@ void FluidSim::solve_pressure(float dt) {
             //Rotation
             rhs[index] += -angular_velocity * base_rot_z(i, j);
 
-            /*
-            //LHS matrix contributions
-            for (int k = 0; k < ni; ++k) {
-               for (int m = 0; m < nj; ++m) {
-                  double val = 0;
+            
+            ////LHS matrix contributions
+            //for (int k = 0; k < ni; ++k) {
+            //   for (int m = 0; m < nj; ++m) {
+            //      double val = 0;
 
-                  //Translation
-                  val += base_trans_x(i, j) * base_trans_x(k, m) * rigid_u_mass;
-                  val += base_trans_y(i, j) * base_trans_y(k, m) * rigid_v_mass;
+            //      //Translation
+            //      val += base_trans_x(i, j) * base_trans_x(k, m) * rigid_u_mass;
+            //      val += base_trans_y(i, j) * base_trans_y(k, m) * rigid_v_mass;
 
-                  //Rotation
-                  val += base_rot_z(i, j) * base_rot_z(k, m) * Jinv;
+            //      //Rotation
+            //      val += base_rot_z(i, j) * base_rot_z(k, m) * Jinv;
 
-                  if (val != 0)
-                     matrix.add_to_element(i + ni*j, k + ni*m, val);
-               }
-            }
-            */
+            //      if (val != 0)
+            //         matrix.add_to_element(i + ni*j, k + ni*m, val);
+            //   }
+            //}
+            
          }
       }
    }

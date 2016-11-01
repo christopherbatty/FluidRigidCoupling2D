@@ -228,7 +228,7 @@ struct PCGSolver
 {
    PCGSolver(void)
    {
-      set_solver_parameters(1e-5, 100, 0.97, 0.25);
+      set_solver_parameters(1e-4, 1000, 0.0, 0.25);
    }
 
    void set_solver_parameters(T tolerance_factor_, int max_iterations_, T modified_incomplete_cholesky_parameter_=0.97, T min_diagonal_ratio_=0.25)
