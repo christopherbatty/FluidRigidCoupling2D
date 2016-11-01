@@ -1,0 +1,17 @@
+Debug/
+Release/
+*.suo
+*.XML
+*.sdf
+*.opensdf
+*.filters
+BetterMerge.v11.suo
+*.ncb
+*.user
+*.config
+*.ps1
+*.psd1
+*.psm1
+*.nupkg
+swum-cache.txt
+
