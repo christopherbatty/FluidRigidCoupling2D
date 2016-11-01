@@ -96,7 +96,7 @@ void FluidSim::advance(float dt) {
       advect(substep);
       add_force(substep);
 
-      apply_viscosity(substep);
+      //apply_viscosity(substep);
 
       apply_projection(substep); 
       
@@ -347,8 +347,8 @@ void FluidSim::update_rigid_body_grids()
    //balance in hydrostatic scenarios.
    double u_sum = std::accumulate(rigid_u_weights.a.begin(), rigid_u_weights.a.end(), 0.0);
    double v_sum = std::accumulate(rigid_v_weights.a.begin(), rigid_v_weights.a.end(), 0.0);
-   rigid_u_mass = rbd->getDensity() * u_sum;
-   rigid_v_mass = rbd->getDensity() * v_sum;
+   rigid_u_mass = rbd->getDensity() * (float)u_sum;
+   rigid_v_mass = rbd->getDensity() * (float)v_sum;
 }
 
 //Add a tracer particle for visualization
@@ -559,10 +559,10 @@ void FluidSim::solve_pressure(float dt) {
          base_trans_y(i, j) = -v_term / rigid_v_mass;
 
          // Rotation coupling
-         Vec3f position((i + 0.5) * dx, (j + 0.5) * dx, 0);
+         Vec3f position((i + 0.5f) * dx, (j + 0.5f) * dx, 0);
          Vec3f centre_3d(centre_of_mass[0], centre_of_mass[1], 0);
          Vec3f rad3d = position - centre_3d;
-         Vec3f vol_terms(u_term, v_term, 0);
+         Vec3f vol_terms((float)u_term, (float)v_term, 0);
          Vec3f result = -cross(rad3d, vol_terms);
          base_rot_z(i, j) = result[2];
       }
@@ -661,7 +661,7 @@ void FluidSim::solve_pressure(float dt) {
       }
    }
 
-   double val;
+   
    const float Jinv = rbd->getInvInertiaModulus();
 
    for (int j = 0; j < nj; ++j) {
