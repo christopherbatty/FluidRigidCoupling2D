@@ -40,12 +40,12 @@ void FluidSim::initialize(float width, int ni_, int nj_) {
    liquid_phi.resize(ni,nj);
    particle_radius = dx/sqrt(2.0f);
    viscosity.resize(ni,nj);
-   viscosity.assign(0.5f);
+   viscosity.assign(0.05f);
    //surface.reset_phi(circle_phi, dx, Vec2f(0.5*dx,0.5*dx), ni, nj);
    
    rigidgeom = new Box2DGeometry(0.2f, 0.2f);
    rbd = new RigidBody(1, *rigidgeom);
-   rbd->setCOM(Vec2f(0.5f, 0.5f));
+   rbd->setCOM(Vec2f(0.5f, 0.7f));
    rbd->setAngularMomentum(0.0001f);
 }
 
@@ -544,9 +544,32 @@ void FluidSim::compute_viscosity_weights() {
 //An implementation of the variational pressure projection solve for static geometry
 void FluidSim::solve_pressure(float dt) {
    
-   //This linear system could be simplified, but I've left it as is for clarity 
-   //and consistency with the standard naive discretization
    
+   // Assemble the data for the J vectors
+   Array2d base_trans_x(ni, nj), base_trans_y(ni, nj), base_rot_z(ni, nj);
+   Vec2f centre_of_mass;
+   rbd->getCOM(centre_of_mass);
+
+   // Browsing u and v-cells together, since it's the same loop
+   for (int j = 0; j != nj; ++j) {
+      for (int i = 0; i != ni; ++i) {
+         double u_term = (rigid_u_weights(i, j) - rigid_u_weights(i + 1, j)) / dx;
+         double v_term = (rigid_v_weights(i, j) - rigid_v_weights(i, j + 1)) / dx;
+
+         // Translation coupling
+         base_trans_x(i, j) = -u_term / rigid_u_mass;
+         base_trans_y(i, j) = -v_term / rigid_v_mass;
+
+         // Rotation coupling
+         Vec3f position((i + 0.5) * dx, (j + 0.5) * dx, 0);
+         Vec3f centre_3d(centre_of_mass[0], centre_of_mass[1], 0);
+         Vec3f rad3d = position - centre_3d;
+         Vec3f vol_terms(u_term, v_term, 0);
+         Vec3f result = -cross(rad3d, vol_terms);
+         base_rot_z(i, j) = result[2];
+      }
+   }
+
    int ni = v.ni;
    int nj = u.nj;
    int system_size = ni*nj;
@@ -621,6 +644,26 @@ void FluidSim::solve_pressure(float dt) {
                matrix.add_to_element(index, index, term/theta);
             }
             rhs[index] += v_weights(i,j)*v(i,j) / dx;
+         }
+      }
+   }
+
+   Vec2f solidLinearVelocity;
+   float angular_velocity;
+   rbd->getLinearVelocity(solidLinearVelocity);
+   rbd->getAngularVelocity(angular_velocity);
+
+   for (int j = 0; j < nj; ++j) {
+      for (int i = 0; i < ni; ++i) {
+         int index = i + ni*j;
+         float centre_phi = liquid_phi(i, j);
+         if (centre_phi < 0) {
+            // Translation
+            rhs[index] += -solidLinearVelocity[0] * base_trans_x(i, j) * rigid_u_mass;
+            rhs[index] += -solidLinearVelocity[1] * base_trans_y(i, j) * rigid_v_mass;
+
+            //Rotation
+            rhs[index] += -angular_velocity * base_rot_z(i, j);
          }
       }
    }

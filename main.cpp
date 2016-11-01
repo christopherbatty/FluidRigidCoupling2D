@@ -16,7 +16,7 @@ using namespace std;
 
 //Try changing the grid resolution
 int grid_resolution = 100;
-float timestep = 0.1f;
+float timestep = 0.05f;
 
 //Display properties
 bool draw_grid = false;
@@ -90,7 +90,7 @@ int main(int argc, char **argv)
          
          //add a column (for buckling) and a beam (for bending) and a disk (for rolling and flowing)
          //if(boundary_phi(pt) > 0 && (pt[0] > 0.42f && pt[0] < 0.46f || pt[0] < 0.36 && pt[1] > 0.45f && pt[1] < 0.5f || circle_phi(pt, Vec2f(0.7f, 0.65f), 0.1f) < 0))
-         if (circle_phi(pt, Vec2f(0.35f, 0.75f), 0.1f) < 0)
+         if (circle_phi(pt, Vec2f(0.5f, 0.3f), 0.2f) < 0)
             sim.add_particle(pt);
          
       }
