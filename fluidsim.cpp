@@ -44,8 +44,8 @@ void FluidSim::initialize(float width, int ni_, int nj_) {
    //surface.reset_phi(circle_phi, dx, Vec2f(0.5*dx,0.5*dx), ni, nj);
    
    rigidgeom = new Box2DGeometry(0.2f, 0.2f);
-   rbd = new RigidBody(10.0, *rigidgeom);
-   rbd->setCOM(Vec2f(0.5f, 0.6f));
+   rbd = new RigidBody(1, *rigidgeom);
+   rbd->setCOM(Vec2f(0.5f, 0.7f));
    rbd->setAngularMomentum(0.0f);
    rbd->setLinearVelocity(Vec2f(0, 0));
 }
@@ -446,7 +446,7 @@ void FluidSim::compute_phi() {
       }
    } 
 
-   liquid_phi.assign(-1);
+   //liquid_phi.assign(-1);
 }
 
 
@@ -553,20 +553,17 @@ void FluidSim::solve_pressure(float dt) {
    rbd->getCOM(centre_of_mass);
    for (int j = 0; j != nj; ++j) {
       for (int i = 0; i != ni; ++i) {
-         double u_term = (rigid_u_weights(i, j) - rigid_u_weights(i + 1, j)) / dx;
-         double v_term = (rigid_v_weights(i, j) - rigid_v_weights(i, j + 1)) / dx;
+         double u_term = (rigid_u_weights(i + 1, j) - rigid_u_weights(i, j)) / dx;
+         double v_term = (rigid_v_weights(i, j + 1) - rigid_v_weights(i, j)) / dx;
 
          // Translation coupling
-         base_trans_x(i, j) = -u_term / rigid_u_mass;
-         base_trans_y(i, j) = -v_term / rigid_v_mass;
+         base_trans_x(i, j) = u_term;
+         base_trans_y(i, j) = v_term;
 
          // Rotation coupling
-         Vec3f position((i + 0.5f) * dx, (j + 0.5f) * dx, 0);
-         Vec3f centre_3d(centre_of_mass[0], centre_of_mass[1], 0);
-         Vec3f rad3d = position - centre_3d;
-         Vec3f vol_terms((float)u_term, (float)v_term, 0);
-         Vec3f result = -cross(rad3d, vol_terms);
-         base_rot_z(i, j) = result[2];
+         Vec2f position((i + 0.5f) * dx, (j + 0.5f) * dx);
+         Vec2f rad = position - centre_of_mass;
+         base_rot_z(i, j) = -rad[0]*v_term + rad[1]*u_term;
       }
    }
 
@@ -653,16 +650,6 @@ void FluidSim::solve_pressure(float dt) {
    rbd->getLinearVelocity(solidLinearVelocity);
    rbd->getAngularVelocity(angular_velocity);
 
-   for (int j = 0; j < nj; ++j) {
-      for (int i = 0; i < ni; ++i) {
-         int index = i + ni*j;
-         float centre_phi = liquid_phi(i, j);
-         if (centre_phi < 0) {
-            
-         }
-      }
-   }
-
    
    const float Jinv = rbd->getInvInertiaModulus();
 
@@ -674,29 +661,28 @@ void FluidSim::solve_pressure(float dt) {
 
             //RHS contributions...
             // Translation
-            rhs[index] += -solidLinearVelocity[0] * base_trans_x(i, j) * rigid_u_mass;
-            rhs[index] += -solidLinearVelocity[1] * base_trans_y(i, j) * rigid_v_mass;
+            rhs[index] += -solidLinearVelocity[0] * base_trans_x(i, j);
+            rhs[index] += -solidLinearVelocity[1] * base_trans_y(i, j);
 
             //Rotation
             rhs[index] += -angular_velocity * base_rot_z(i, j);
-
             
-            ////LHS matrix contributions
-            //for (int k = 0; k < ni; ++k) {
-            //   for (int m = 0; m < nj; ++m) {
-            //      double val = 0;
+            //LHS matrix contributions
+            for (int k = 0; k < ni; ++k) {
+               for (int m = 0; m < nj; ++m) {
+                  double val = 0;
 
-            //      //Translation
-            //      val += base_trans_x(i, j) * base_trans_x(k, m) * rigid_u_mass;
-            //      val += base_trans_y(i, j) * base_trans_y(k, m) * rigid_v_mass;
+                  //Translation
+                  val += dt * base_trans_x(i, j) * base_trans_x(k, m) / rigid_u_mass;
+                  val += dt * base_trans_y(i, j) * base_trans_y(k, m) / rigid_v_mass;
 
-            //      //Rotation
-            //      val += base_rot_z(i, j) * base_rot_z(k, m) * Jinv;
+                  //Rotation
+                  val += dt * base_rot_z(i, j) * base_rot_z(k, m) * Jinv;
 
-            //      if (val != 0)
-            //         matrix.add_to_element(i + ni*j, k + ni*m, val);
-            //   }
-            //}
+                  if (fabs(val) > 1e-10)
+                     matrix.add_to_element(i + ni*j, k + ni*m, val);
+               }
+            }
             
          }
       }
@@ -742,25 +728,25 @@ void FluidSim::solve_pressure(float dt) {
    }
 
    ////Get pressure update to apply to solid
-   //Vec2f updated_rigid_linear_velocity;
-   //float updated_rigid_angular_momentum;
-   //rbd->getLinearVelocity(updated_rigid_linear_velocity);
-   //rbd->getAngularMomentum(updated_rigid_angular_momentum);
-   //for (int j = 0; j < nj; ++j) {
-   //   for (int i = 0; i < ni; ++i) {
-   //      int index = i + ni*j;
-   //      float centre_phi = liquid_phi(i, j);
-   //      if (centre_phi < 0) {
-   //         updated_rigid_linear_velocity[0] += base_trans_x(i, j)*pressure[index];
-   //         updated_rigid_linear_velocity[1] += base_trans_y(i, j)*pressure[index];
+   Vec2f updated_rigid_linear_velocity;
+   float updated_rigid_angular_momentum;
+   rbd->getLinearVelocity(updated_rigid_linear_velocity);
+   rbd->getAngularMomentum(updated_rigid_angular_momentum);
+   for (int j = 0; j < nj; ++j) {
+      for (int i = 0; i < ni; ++i) {
+         int index = i + ni*j;
+         float centre_phi = liquid_phi(i, j);
+         if (centre_phi < 0) {
+            updated_rigid_linear_velocity[0] += (float)((double)dt*base_trans_x(i, j)*pressure[index] / (double)rigid_u_mass);
+            updated_rigid_linear_velocity[1] += (float)((double)dt*base_trans_y(i, j)*pressure[index] / (double)rigid_v_mass);
 
-   //         updated_rigid_angular_momentum += base_rot_z(i, j) * pressure[index];
-   //      }
-   //   }
-   //}
+            updated_rigid_angular_momentum += (float)((double)dt*base_rot_z(i, j) * pressure[index]);
+         }
+      }
+   }
 
-   //rbd->setLinearVelocity(updated_rigid_linear_velocity);
-   //rbd->setAngularMomentum(updated_rigid_angular_momentum);
+   rbd->setLinearVelocity(updated_rigid_linear_velocity);
+   rbd->setAngularMomentum(updated_rigid_angular_momentum);
 
 }
 
