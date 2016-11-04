@@ -32,6 +32,8 @@ public:
    Array2f rigid_u_weights, rigid_v_weights;
    float rigid_u_mass, rigid_v_mass;
 
+   Array2f solid_u, solid_v;
+
    //Data for pressure solve and extrapolation
    Array2c u_valid, v_valid;
    Array2f liquid_phi; //extracted from particles
@@ -58,6 +60,7 @@ public:
    std::vector<double> velocities;
 
    Vec2f get_velocity(const Vec2f& position);
+   Vec2f get_solid_velocity(const Vec2f& position);
    void add_particle(const Vec2f& position);
 
 private:
@@ -87,6 +90,7 @@ private:
    void constrain_velocity();
    void process_collisions();
    void update_rigid_body_grids();
+   void recompute_solid_velocity();
 };
 
 #endif

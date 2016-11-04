@@ -15,13 +15,13 @@
 using namespace std;
 
 //Try changing the grid resolution
-int grid_resolution = 60;
+int grid_resolution = 40;
 float timestep = 0.05f;
 
 //Display properties
-bool draw_grid = false;
+bool draw_grid = true;
 bool draw_particles = true;
-bool draw_velocities = false;
+bool draw_velocities = true;
 bool draw_boundaries = true;
 bool draw_rbd = true;
 
@@ -135,7 +135,7 @@ void display(void)
       glColor3f(1,0,0);
       for(int j = 0;j < sim.nj; ++j) for(int i = 0; i < sim.ni; ++i) {
          Vec2f pos((i+0.5f)*sim.dx,(j+0.5f)*sim.dx);
-         draw_arrow2d(pos, pos + 0.01f*sim.get_velocity(pos), 0.01f*sim.dx);
+         draw_arrow2d(pos, pos + sim.get_velocity(pos), 0.1f*sim.dx);
       }
    }
 

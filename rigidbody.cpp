@@ -157,7 +157,7 @@ void RigidBody::advance(const float dt)
 
   //Add force and torque
   applyForce(Vec2f(0, -0.1f), dt);
-  applyTorque(0, dt);
+  applyTorque(0.0, dt);
   
 }
 void RigidBody::getAngularVelocity(float&wz) 
