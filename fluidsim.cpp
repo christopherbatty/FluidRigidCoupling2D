@@ -44,7 +44,7 @@ void FluidSim::initialize(float width, int ni_, int nj_) {
    //surface.reset_phi(circle_phi, dx, Vec2f(0.5*dx,0.5*dx), ni, nj);
    
    rigidgeom = new Box2DGeometry(0.2f, 0.2f);
-   rbd = new RigidBody(1, *rigidgeom);
+   rbd = new RigidBody(10, *rigidgeom);
    rbd->setCOM(Vec2f(0.5f, 0.7f));
    rbd->setAngularMomentum(0.0f);
    rbd->setLinearVelocity(Vec2f(0, 0));
@@ -92,6 +92,8 @@ void FluidSim::advance(float dt) {
 
       //Estimate the liquid signed distance
       compute_phi();
+
+      liquid_phi.assign(-1);
 
       //Advance the velocity
       advect(substep);
@@ -661,11 +663,11 @@ void FluidSim::solve_pressure(float dt) {
 
             //RHS contributions...
             // Translation
-            rhs[index] += -solidLinearVelocity[0] * base_trans_x(i, j);
-            rhs[index] += -solidLinearVelocity[1] * base_trans_y(i, j);
+            rhs[index] -= solidLinearVelocity[0] * base_trans_x(i, j);
+            rhs[index] -= solidLinearVelocity[1] * base_trans_y(i, j);
 
             //Rotation
-            rhs[index] += -angular_velocity * base_rot_z(i, j);
+            rhs[index] -= angular_velocity * base_rot_z(i, j);
             
             //LHS matrix contributions
             for (int k = 0; k < ni; ++k) {
