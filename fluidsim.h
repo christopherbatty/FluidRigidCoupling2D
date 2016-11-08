@@ -53,7 +53,6 @@ public:
    PCGSolver<double> solver;
    SparseMatrixd matrix;
    std::vector<double> rhs;
-   std::vector<double> pressure;
 
    SparseMatrixd vmatrix;
    std::vector<double> vrhs;

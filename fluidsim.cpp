@@ -648,10 +648,7 @@ void FluidSim::solve_pressure(float dt) {
    int system_size = ni*nj;
    if (rhs.size() != system_size) {
       rhs.resize(system_size);
-      pressure.resize(system_size);
-      matrix.resize(system_size);
    }
-   matrix.zero();
      
    std::vector<Eigen::Triplet<double>> triplets;
 
@@ -662,7 +659,6 @@ void FluidSim::solve_pressure(float dt) {
       for (int i = 1; i < ni - 1; ++i) {
          int index = i + ni*j;
          rhs[index] = 0;
-         pressure[index] = 0;
          float centre_phi = liquid_phi(i, j);
          if (centre_phi < 0) {
 
@@ -671,15 +667,12 @@ void FluidSim::solve_pressure(float dt) {
             if (term > 0) {
                float right_phi = liquid_phi(i + 1, j);
                if (right_phi < 0) {
-                  matrix.add_to_element(index, index, term);
-                  matrix.add_to_element(index, index + 1, -term);
                   triplets.push_back(Eigen::Triplet<double>(index, index, term));
                   triplets.push_back(Eigen::Triplet<double>(index, index+1, -term));
                }
                else {
                   float theta = fraction_inside(centre_phi, right_phi);
                   if (theta < 0.01f) theta = 0.01f;
-                  matrix.add_to_element(index, index, term / theta);
                   triplets.push_back(Eigen::Triplet<double>(index, index, term/theta));
                   any_liquid_surface = true;
                }
@@ -691,15 +684,12 @@ void FluidSim::solve_pressure(float dt) {
             if (term > 0) {
                float left_phi = liquid_phi(i - 1, j);
                if (left_phi < 0) {
-                  matrix.add_to_element(index, index, term);
-                  matrix.add_to_element(index, index - 1, -term);
                   triplets.push_back(Eigen::Triplet<double>(index, index, term));
                   triplets.push_back(Eigen::Triplet<double>(index, index - 1, -term));
                }
                else {
                   float theta = fraction_inside(centre_phi, left_phi);
                   if (theta < 0.01f) theta = 0.01f;
-                  matrix.add_to_element(index, index, term / theta);
                   triplets.push_back(Eigen::Triplet<double>(index, index, term/theta));
                   any_liquid_surface = true;
                }
@@ -711,15 +701,12 @@ void FluidSim::solve_pressure(float dt) {
             if (term > 0) {
                float top_phi = liquid_phi(i, j + 1);
                if (top_phi < 0) {
-                  matrix.add_to_element(index, index, term);
-                  matrix.add_to_element(index, index + ni, -term);
                   triplets.push_back(Eigen::Triplet<double>(index, index, term));
                   triplets.push_back(Eigen::Triplet<double>(index, index + ni, -term));
                }
                else {
                   float theta = fraction_inside(centre_phi, top_phi);
                   if (theta < 0.01f) theta = 0.01f;
-                  matrix.add_to_element(index, index, term / theta);
                   triplets.push_back(Eigen::Triplet<double>(index, index, term/theta));
                   any_liquid_surface = true;
                }
@@ -731,15 +718,12 @@ void FluidSim::solve_pressure(float dt) {
             if (term > 0) {
                float bot_phi = liquid_phi(i, j - 1);
                if (bot_phi < 0) {
-                  matrix.add_to_element(index, index, term);
-                  matrix.add_to_element(index, index - ni, -term);
                   triplets.push_back(Eigen::Triplet<double>(index, index, term));
                   triplets.push_back(Eigen::Triplet<double>(index, index -ni, -term));
                }
                else {
                   float theta = fraction_inside(centre_phi, bot_phi);
                   if (theta < 0.01f) theta = 0.01f;
-                  matrix.add_to_element(index, index, term / theta);
                   triplets.push_back(Eigen::Triplet<double>(index, index, term/theta));
                   any_liquid_surface = true;
                }
@@ -785,7 +769,6 @@ void FluidSim::solve_pressure(float dt) {
                   val += dt * base_rot_z(i, j) * base_rot_z(k, m) * Jinv;
 
                   if (fabs(val) > 1e-10) {
-                     matrix.add_to_element(i + ni*j, k + ni*m, val);
                      triplets.push_back(Eigen::Triplet<double>(i + ni*j, k + ni*m, val));
                   }
                }
@@ -797,24 +780,29 @@ void FluidSim::solve_pressure(float dt) {
 
    //Solve the system using Robert Bridson's incomplete Cholesky PCG solver
    
-   //replace empty rows/cols
-   for (unsigned int row = 0; row < matrix.n; ++row) {
-      if (matrix.index[row].size() == 0) {
-         matrix.add_to_element(row, row, 1);
-         triplets.push_back(Eigen::Triplet<double>(row, row, 1));
+  
+   Eigen::SparseMatrix<double> Ematrix(system_size, system_size);
+   Eigen::VectorXd Erhs(system_size);
+   Ematrix.setFromTriplets(triplets.begin(), triplets.end());
+
+   
+   //replace empty rows/cols to make (at least) positive semi-definite
+   for (unsigned int row = 0; row < Ematrix.outerSize(); ++row) {
+      
+      //TODO: There has to be a way to extract this count intelligently in Eigen
+      int count = 0;
+      for (Eigen::SparseMatrix<double>::InnerIterator it(Ematrix, row); it; ++it){
+         ++count;
+      }
+      if (count == 0) {
+         Ematrix.coeffRef(row, row) = 1;
          rhs[row] = 0;
       }
    }
 
-   
-   Eigen::SparseMatrix<double> Ematrix(system_size, system_size);
-   Eigen::VectorXd Erhs(system_size);
 
-  
-   //set up Matrix
-   Ematrix.setFromTriplets(triplets.begin(), triplets.end());
-
-   //pin one pressure sample to remove the 1D null space
+   //pin one pressure sample to remove the 1D null space, and make truly Positive Definite
+   //in case where there is no liquid surface.
    if (!any_liquid_surface) {
       int del_index = -1;
       for (int j = 0; j < nj && del_index <0; ++j) for (int i = 0; i < ni && del_index <0; ++i) {
@@ -825,8 +813,8 @@ void FluidSim::solve_pressure(float dt) {
             break;
          }
       }
-      matrix.symmetric_remove_row_and_column(del_index);
-      matrix.add_to_element(del_index, del_index, 1);
+      
+      //zero the RHS
       rhs[del_index] = 0;
 
       //replace row/col with identity
@@ -841,6 +829,7 @@ void FluidSim::solve_pressure(float dt) {
          }
       }
    }
+   Ematrix.makeCompressed();
 
    //set up RHS
    for (int i = 0; i < system_size; ++i)
@@ -850,18 +839,18 @@ void FluidSim::solve_pressure(float dt) {
    Esolver.compute(Ematrix);
    if (Esolver.info() != Eigen::Success) {
       std::cout << "Eigen factorization failed.\n";
+      exit(0);
    }
-   Eigen::VectorXd x = Esolver.solve(Erhs);
+   Eigen::VectorXd pressure = Esolver.solve(Erhs);
    if (Esolver.info() != Eigen::Success) {
       std::cout << "Eigen solve failed.\n";
+      exit(0);
    }
    else {
       std::cout << "Eigen solve succeeded.\n";
    }
 
-   for (int i = 0; i < pressure.size(); ++i)
-      pressure[i] = x[i];
-
+ 
    //Apply the velocity update
    u_valid.assign(0);
    for (int j = 0; j < u.nj; ++j) for (int i = 1; i < u.ni - 1; ++i) {
