@@ -228,7 +228,7 @@ struct PCGSolver
 {
    PCGSolver(void)
    {
-      set_solver_parameters(1e-4, 1000, 0.0, 0.25);
+      set_solver_parameters(1e-4, 10000, 0.0, 0.25);
    }
 
    void set_solver_parameters(T tolerance_factor_, int max_iterations_, T modified_incomplete_cholesky_parameter_=0.97, T min_diagonal_ratio_=0.25)
@@ -257,6 +257,7 @@ struct PCGSolver
       apply_preconditioner(r, z);
       double rho=BLAS::dot(z, r);
       if(rho==0 || rho!=rho) {
+         std::cout << "Preconditioner failure.\n";
          iterations_out=0;
          return false;
       }
