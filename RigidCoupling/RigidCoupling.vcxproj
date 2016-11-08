@@ -110,7 +110,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>C:\Users\batty\Documents\Libraries\freeglut-2.8.1\include;C:\Users\batty\Documents\Libraries\eigen-3.2.5;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\batty\Documents\Libraries\freeglut-2.8.1\include;C:\Users\batty\Documents\Libraries\eigen-3.2.5;C:\Users\batty\Documents\Libraries\eigen-3.2.5\unsupported;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>

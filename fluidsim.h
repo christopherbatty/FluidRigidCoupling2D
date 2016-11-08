@@ -49,11 +49,8 @@ public:
    //Data arrays for extrapolation
    Array2c valid, old_valid;
 
-   //Solver data
+   //Viscosity solver data
    PCGSolver<double> solver;
-   SparseMatrixd matrix;
-   std::vector<double> rhs;
-
    SparseMatrixd vmatrix;
    std::vector<double> vrhs;
    std::vector<double> velocities;
