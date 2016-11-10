@@ -19,7 +19,7 @@ int grid_resolution = 40;
 float timestep = 0.05f;
 
 //Display properties
-bool draw_grid = false;
+bool draw_grid = true;
 bool draw_particles = true;
 bool draw_velocities = false;
 bool draw_boundaries = true;
@@ -81,6 +81,7 @@ int main(int argc, char **argv)
    
    //Set up the simulation
    sim.initialize(grid_width, grid_resolution, grid_resolution);
+   sim.indefinite_form = indefinite_form;
    
    //set up a circle boundary
    sim.set_boundary(boundary_phi);
@@ -95,7 +96,7 @@ int main(int argc, char **argv)
          
          //add a column (for buckling) and a beam (for bending) and a disk (for rolling and flowing)
          //if(boundary_phi(pt) > 0 && (pt[0] > 0.42f && pt[0] < 0.46f || pt[0] < 0.36 && pt[1] > 0.45f && pt[1] < 0.5f || circle_phi(pt, Vec2f(0.7f, 0.65f), 0.1f) < 0))
-         if (circle_phi(pt, Vec2f(0.5f, 0.3f), 0.2f) < 0)
+         if (circle_phi(pt, Vec2f(0.5f, 0.4f), 0.25f) < 0)
             sim.add_particle(pt);
          
       }
@@ -128,7 +129,7 @@ void display(void)
 
    if(draw_particles) {
       glColor3f(0, 0, 0);
-      //draw_points2d(sim.particles);
+      draw_points2d(sim.particles);
       glColor3f(0,0,1);
       glPointSize(3);
       glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);

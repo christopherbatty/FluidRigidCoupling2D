@@ -476,13 +476,13 @@ void FluidSim::advect_particles(float dt) {
    for (unsigned int p = 0; p < particles.size(); ++p) {
       for (unsigned int p2 = 0; p2 < particles.size(); ++p2) {
          if (p == p2) continue;
-         float target_dist = 0.35f*dx;
+         float target_dist = 0.5f*dx;
          if (dist(particles[p], particles[p2]) < target_dist) {
             Vec2f sepvec = particles[p] - particles[p2];
             float curdist = mag(sepvec);
             normalize(sepvec);
-            particles[p] += 0.5f*(curdist - target_dist)*sepvec;
-            particles[p2] -= 0.5f*(curdist - target_dist)*sepvec;
+            particles[p] -= 0.5f*(curdist - target_dist)*sepvec;
+            particles[p2] += 0.5f*(curdist - target_dist)*sepvec;
          }
       }
    }
