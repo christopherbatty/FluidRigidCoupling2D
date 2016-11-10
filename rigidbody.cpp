@@ -1,6 +1,6 @@
 #include "rigidbody.h"
 #include <iostream>
-#include "mat.h"
+//#include "mat.h"
 #include "vec.h"
 #include "gluvi.h"
 

@@ -5,7 +5,8 @@
 #include "vec.h"
 #include "pcgsolver/sparse_matrix.h"
 #include "pcgsolver/pcg_solver.h"
-#include "coupledrigidbody.h"
+#include "rigidbody.h"
+
 #include <vector>
 
 class FluidSim {
@@ -14,6 +15,8 @@ public:
    void initialize(float width, int ni_, int nj_);
    void set_boundary(float (*phi)(const Vec2f&));
    void advance(float dt);
+
+   bool indefinite_form;
 
    //Grid dimensions
    int ni,nj;
@@ -75,8 +78,10 @@ private:
 
    void apply_projection(float dt);
    void compute_pressure_weights();
-   void solve_pressure(float dt);
    
+   void solve_pressure(float dt);
+   void solve_pressure_indefinite(float dt);
+
    int u_ind(int i, int j);
    int v_ind(int i, int j);
    void apply_viscosity(float dt);

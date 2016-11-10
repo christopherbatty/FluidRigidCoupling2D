@@ -15,17 +15,22 @@
 using namespace std;
 
 //Try changing the grid resolution
-int grid_resolution = 60;
+int grid_resolution = 40;
 float timestep = 0.05f;
 
 //Display properties
-bool draw_grid = true;
+bool draw_grid = false;
 bool draw_particles = true;
-bool draw_velocities = true;
+bool draw_velocities = false;
 bool draw_boundaries = true;
 bool draw_rbd = true;
 
 float grid_width = 1;
+
+bool indefinite_form = false; //True - Batty '07 linear system: SPD, but with dense chunks
+                              //False - Same numerics, but Robinson-Mosher '08 linear system: fully sparse, but symmetric indefinite.
+
+//both forms use finite volume face area weights as in Ng et al. 2009 (rather than volume fractions as in Batty '07).
 
 FluidSim sim;
 
@@ -90,7 +95,7 @@ int main(int argc, char **argv)
          
          //add a column (for buckling) and a beam (for bending) and a disk (for rolling and flowing)
          //if(boundary_phi(pt) > 0 && (pt[0] > 0.42f && pt[0] < 0.46f || pt[0] < 0.36 && pt[1] > 0.45f && pt[1] < 0.5f || circle_phi(pt, Vec2f(0.7f, 0.65f), 0.1f) < 0))
-         if (circle_phi(pt, Vec2f(0.5f, 0.3f), 0.15f) < 0)
+         if (circle_phi(pt, Vec2f(0.5f, 0.3f), 0.2f) < 0)
             sim.add_particle(pt);
          
       }
@@ -123,7 +128,7 @@ void display(void)
 
    if(draw_particles) {
       glColor3f(0, 0, 0);
-      draw_points2d(sim.particles);
+      //draw_points2d(sim.particles);
       glColor3f(0,0,1);
       glPointSize(3);
       glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);

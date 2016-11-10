@@ -10,7 +10,6 @@
 #include <functional>
 #include <fstream>
 #include "Eigen/Sparse"
-#include "Eigen/SparseLU"
 #include "Eigen/SparseExtra"
 
 float fraction_inside(float phi_left, float phi_right);
@@ -45,11 +44,10 @@ void FluidSim::initialize(float width, int ni_, int nj_) {
    liquid_phi.resize(ni, nj);
    particle_radius = dx / sqrt(2.0f);
    viscosity.resize(ni, nj);
-   viscosity.assign(0.05f);
-   //surface.reset_phi(circle_phi, dx, Vec2f(0.5*dx,0.5*dx), ni, nj);
+   viscosity.assign(0.005f);
 
-   rigidgeom = new Box2DGeometry(0.4f, 0.15f);
-   rbd = new RigidBody(0.4, *rigidgeom);
+   rigidgeom = new Box2DGeometry(0.3f, 0.2f);
+   rbd = new RigidBody(0.4f, *rigidgeom);
    rbd->setCOM(Vec2f(0.5f, 0.65f));
    rbd->setAngle(0.0);
    rbd->setAngle(-(float)M_PI / 2.0f);
@@ -105,7 +103,7 @@ void FluidSim::advance(float dt) {
       advect(substep);
       add_force(substep);
 
-      apply_viscosity(substep);
+      //apply_viscosity(substep);
 
       apply_projection(substep);
 
@@ -115,6 +113,8 @@ void FluidSim::advance(float dt) {
       extrapolate(u, u_valid);
       extrapolate(v, v_valid);
 
+      //get grid-based approximate solid velocities for use in 
+      //constrained extrapolation
       recompute_solid_velocity();
 
       //For extrapolated velocities, replace the normal component with
@@ -130,7 +130,6 @@ void FluidSim::add_force(float dt) {
    for (int j = 0; j < nj + 1; ++j) for (int i = 0; i < ni; ++i) {
       v(i, j) -= 0.1f*dt;
    }
-   //v(30, 20) = 0.25;
 }
 
 //For extrapolated points, replace the normal component
@@ -211,6 +210,7 @@ void FluidSim::constrain_velocity() {
 void FluidSim::process_collisions() {
 
    //Handle rigid body/rigid body collisions.
+   //This pretty hacky since it's not really the focus here.
 
    //Should really probably find first collision point and back up to that point,
    //rather than trying to project out of walls.
@@ -219,6 +219,8 @@ void FluidSim::process_collisions() {
    //then process positions afterwards
 
    //detect all penetrating, non-separating points
+   //This is roughly following the Guendelman '05
+   //description of impulse response
    std::vector<Vec2f> vertices;
    rbd->get2DVertices(vertices);
    float min_phi = dx;
@@ -320,7 +322,7 @@ void FluidSim::process_collisions() {
 
 
    //project the whole object to be outside the wall.
-   //again, not the ideal way to deal with this...
+   //again, really not the ideal way to deal with this...
    bool found_penetrating = false;
    do {
       found_penetrating = false;
@@ -383,7 +385,7 @@ void FluidSim::update_rigid_body_grids()
       }
    }
 
-   //recompute the "effective" masses per axis, so that we can exactly
+   //recompute the grid-based "effective" masses per axis, so that we can *exactly*
    //balance in hydrostatic scenarios.
    double u_sum = std::accumulate(rigid_u_weights.a.begin(), rigid_u_weights.a.end(), 0.0);
    double v_sum = std::accumulate(rigid_v_weights.a.begin(), rigid_v_weights.a.end(), 0.0);
@@ -453,12 +455,6 @@ void FluidSim::advect_particles(float dt) {
       Vec2f mid_velocity = get_velocity(midpoint);
       particles[p] += dt*mid_velocity;
       Vec2f after = particles[p];
-      if (dist(before, after) > 3 * dx) {
-         std::cout << "Before: " << before << " " << "After: " << after << std::endl;
-         std::cout << "Mid point: " << midpoint << std::endl;
-         std::cout << "Start velocity: " << start_velocity << "  Time step: " << dt << std::endl;
-         std::cout << "Mid velocity: " << mid_velocity << std::endl;
-      }
 
       //Particles can still occasionally leave the domain due to truncation errors, 
       //interpolation error, or large timesteps, so we project them back in for good measure.
@@ -475,16 +471,18 @@ void FluidSim::advect_particles(float dt) {
       rbd->testCollisionAndProject(particles[p], particles[p]);
    }
 
+   //Simple particle adjustment for when they drift too close. 
+   //Scales badly for now.
    for (unsigned int p = 0; p < particles.size(); ++p) {
       for (unsigned int p2 = 0; p2 < particles.size(); ++p2) {
          if (p == p2) continue;
-         float target_dist = 0.35*dx;
+         float target_dist = 0.35f*dx;
          if (dist(particles[p], particles[p2]) < target_dist) {
             Vec2f sepvec = particles[p] - particles[p2];
             float curdist = mag(sepvec);
             normalize(sepvec);
-            particles[p] += 0.5*(curdist - target_dist)*sepvec;
-            particles[p2] -= 0.5*(curdist - target_dist)*sepvec;
+            particles[p] += 0.5f*(curdist - target_dist)*sepvec;
+            particles[p2] -= 0.5f*(curdist - target_dist)*sepvec;
          }
       }
    }
@@ -526,7 +524,6 @@ void FluidSim::compute_phi() {
       }
    }
 
-   //liquid_phi.assign(-1);
 }
 
 
@@ -536,8 +533,13 @@ void FluidSim::apply_projection(float dt) {
    //Compute finite-volume type face area weight for each velocity sample.
    compute_pressure_weights();
 
-   //Set up and solve the variational pressure solve.
-   solve_pressure(dt);
+   //Set up and solve the variational pressure solve, in either SPD or indefinite forms.
+   if (!indefinite_form) {
+      solve_pressure(dt); //original Batty '07 style: SPD, but with dense blocks due to J'MJ terms
+   }
+   else {
+      solve_pressure_indefinite(dt); //Same algebra, but "undoing" the Schur complement to add rigid velocity as a variable. Sparse, but indefinite.
+   }
 
 }
 
@@ -800,6 +802,7 @@ void FluidSim::solve_pressure(float dt) {
    for (int row = 0; row < Ematrix.outerSize(); ++row) {
       
       //TODO: There has to be a way to extract this count intelligently in Eigen
+      //rather than simply counting.
       int count = 0;
       for (Eigen::SparseMatrix<double>::InnerIterator it(Ematrix, row); it; ++it){
          ++count;
@@ -812,7 +815,7 @@ void FluidSim::solve_pressure(float dt) {
 
 
    //pin one pressure sample to remove the 1D null space, and make truly Positive Definite
-   //in case where there is no liquid surface.
+   //(in the case where there is no liquid surface).
    if (!any_liquid_surface) {
       int del_index = -1;
       for (int j = 0; j < nj && del_index <0; ++j) for (int i = 0; i < ni && del_index <0; ++i) {
@@ -842,7 +845,7 @@ void FluidSim::solve_pressure(float dt) {
    Ematrix.makeCompressed();
 
    
-   Eigen::SparseLU<Eigen::SparseMatrix<double>> Esolver;
+   Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> Esolver;
    Esolver.compute(Ematrix);
    if (Esolver.info() != Eigen::Success) {
       std::cout << "Eigen factorization failed.\n";
@@ -855,9 +858,7 @@ void FluidSim::solve_pressure(float dt) {
       Eigen::saveMarket(Ematrix, "pressurematrix.matrix");
       exit(0);
    }
-   else {
-      std::cout << "Eigen solve succeeded.\n";
-   }
+   
 
  
    //Apply the velocity update
@@ -913,6 +914,321 @@ void FluidSim::solve_pressure(float dt) {
 
 }
 
+void FluidSim::solve_pressure_indefinite(float dt) {
+
+   // Assemble the data for the J vectors
+   Array2d base_trans_x(ni, nj), base_trans_y(ni, nj), base_rot_z(ni, nj);
+   Vec2f centre_of_mass;
+   rbd->getCOM(centre_of_mass);
+   for (int j = 0; j != nj; ++j) {
+      for (int i = 0; i != ni; ++i) {
+         double u_term = (rigid_u_weights(i + 1, j) - rigid_u_weights(i, j)) / dx;
+         double v_term = (rigid_v_weights(i, j + 1) - rigid_v_weights(i, j)) / dx;
+
+         // Translation coupling
+         base_trans_x(i, j) = u_term;
+         base_trans_y(i, j) = v_term;
+
+         // Rotation coupling
+         Vec2f position((i + 0.5f) * dx, (j + 0.5f) * dx);
+         Vec2f rad = position - centre_of_mass;
+         base_rot_z(i, j) = rad[0] * v_term - rad[1] * u_term;
+      }
+   }
+
+   int ni = v.ni;
+   int nj = u.nj;
+   int system_size = ni*nj + 3; //pressure samples plus 3 entries for rigid solid velocity (translational and rotational)
+
+   std::vector<Eigen::Triplet<double>> triplets;
+   Eigen::VectorXd Erhs(system_size);
+
+   bool any_liquid_surface = false;
+
+   //Build the linear system for pressure
+   for (int j = 1; j < nj - 1; ++j) {
+      for (int i = 1; i < ni - 1; ++i) {
+         int index = i + ni*j;
+         Erhs[index] = 0;
+         float centre_phi = liquid_phi(i, j);
+         if (centre_phi < 0) {
+
+            //right neighbour
+            float term = u_weights(i + 1, j) * dt / sqr(dx);
+            if (term > 0) {
+               float right_phi = liquid_phi(i + 1, j);
+               if (right_phi < 0) {
+                  triplets.push_back(Eigen::Triplet<double>(index, index, term));
+                  triplets.push_back(Eigen::Triplet<double>(index, index + 1, -term));
+               }
+               else {
+                  float theta = fraction_inside(centre_phi, right_phi);
+                  if (theta < 0.01f) theta = 0.01f;
+                  triplets.push_back(Eigen::Triplet<double>(index, index, term / theta));
+                  any_liquid_surface = true;
+               }
+               Erhs[index] -= u_weights(i + 1, j)*u(i + 1, j) / dx;
+            }
+
+            //left neighbour
+            term = u_weights(i, j) * dt / sqr(dx);
+            if (term > 0) {
+               float left_phi = liquid_phi(i - 1, j);
+               if (left_phi < 0) {
+                  triplets.push_back(Eigen::Triplet<double>(index, index, term));
+                  triplets.push_back(Eigen::Triplet<double>(index, index - 1, -term));
+               }
+               else {
+                  float theta = fraction_inside(centre_phi, left_phi);
+                  if (theta < 0.01f) theta = 0.01f;
+                  triplets.push_back(Eigen::Triplet<double>(index, index, term / theta));
+                  any_liquid_surface = true;
+               }
+               Erhs[index] += u_weights(i, j)*u(i, j) / dx;
+            }
+
+            //top neighbour
+            term = v_weights(i, j + 1) * dt / sqr(dx);
+            if (term > 0) {
+               float top_phi = liquid_phi(i, j + 1);
+               if (top_phi < 0) {
+                  triplets.push_back(Eigen::Triplet<double>(index, index, term));
+                  triplets.push_back(Eigen::Triplet<double>(index, index + ni, -term));
+               }
+               else {
+                  float theta = fraction_inside(centre_phi, top_phi);
+                  if (theta < 0.01f) theta = 0.01f;
+                  triplets.push_back(Eigen::Triplet<double>(index, index, term / theta));
+                  any_liquid_surface = true;
+               }
+               Erhs[index] -= v_weights(i, j + 1)*v(i, j + 1) / dx;
+            }
+
+            //bottom neighbour
+            term = v_weights(i, j) * dt / sqr(dx);
+            if (term > 0) {
+               float bot_phi = liquid_phi(i, j - 1);
+               if (bot_phi < 0) {
+                  triplets.push_back(Eigen::Triplet<double>(index, index, term));
+                  triplets.push_back(Eigen::Triplet<double>(index, index - ni, -term));
+               }
+               else {
+                  float theta = fraction_inside(centre_phi, bot_phi);
+                  if (theta < 0.01f) theta = 0.01f;
+                  triplets.push_back(Eigen::Triplet<double>(index, index, term / theta));
+                  any_liquid_surface = true;
+               }
+               Erhs[index] += v_weights(i, j)*v(i, j) / dx;
+            }
+         }
+      }
+   }
+
+
+   Vec2f solidLinearVelocity;
+   float angular_velocity;
+   rbd->getLinearVelocity(solidLinearVelocity);
+   rbd->getAngularVelocity(angular_velocity);
+
+   const float Jinv = rbd->getInvInertiaModulus();
+
+   int rigidbody_start = ni*nj;
+
+   triplets.push_back(Eigen::Triplet<double>(rigidbody_start, rigidbody_start, -rigid_u_mass/dt));
+   triplets.push_back(Eigen::Triplet<double>(rigidbody_start + 1, rigidbody_start + 1, -rigid_v_mass/dt));
+   triplets.push_back(Eigen::Triplet<double>(rigidbody_start + 2, rigidbody_start + 2, -rbd->getInertiaModulus()/dt));
+   Erhs[rigidbody_start]   = -rigid_u_mass*solidLinearVelocity[0]/dt;
+   Erhs[rigidbody_start+1] = -rigid_v_mass*solidLinearVelocity[1]/dt;
+   Erhs[rigidbody_start+2] = -rbd->getInertiaModulus()*angular_velocity/dt;
+
+   for (int j = 0; j < nj; ++j) {
+      for (int i = 0; i < ni; ++i) {
+         int index = i + ni*j;
+         float centre_phi = liquid_phi(i, j);
+         if (centre_phi < 0) {
+            //add J'V to top-right block
+            //and also Jp to bottom-left block
+            
+            double val_x = base_trans_x(i, j);
+            double val_y = base_trans_y(i, j);
+            double val_z = base_rot_z(i, j);
+            if (fabs(val_x) > 1e-10) {
+               triplets.push_back(Eigen::Triplet<double>(i + ni*j, rigidbody_start,     val_x));  //x-trans
+               triplets.push_back(Eigen::Triplet<double>(i + ni*j, rigidbody_start + 1, val_y)); //y-trans
+               triplets.push_back(Eigen::Triplet<double>(i + ni*j, rigidbody_start + 2, val_z)); //z-rot
+
+               triplets.push_back(Eigen::Triplet<double>(rigidbody_start,     i + ni*j, val_x));  //x-trans
+               triplets.push_back(Eigen::Triplet<double>(rigidbody_start + 1, i + ni*j, val_y)); //y-trans
+               triplets.push_back(Eigen::Triplet<double>(rigidbody_start + 2, i + ni*j, val_z)); //z-rot
+            }
+
+         }
+      }
+   }
+
+   /*
+
+   for (int j = 0; j < nj; ++j) {
+      for (int i = 0; i < ni; ++i) {
+         int index = i + ni*j;
+         float centre_phi = liquid_phi(i, j);
+         if (centre_phi < 0) {
+
+            //RHS contributions...
+            // Translation
+            Erhs[index] -= solidLinearVelocity[0] * base_trans_x(i, j);
+            Erhs[index] -= solidLinearVelocity[1] * base_trans_y(i, j);
+
+            //Rotation
+            Erhs[index] -= angular_velocity * base_rot_z(i, j);
+
+            //LHS matrix contributions
+            for (int k = 0; k < ni; ++k) {
+               for (int m = 0; m < nj; ++m) {
+                  double val = 0;
+                  float other_phi = liquid_phi(k, m);
+                  if (other_phi < 0) {
+                     //Translation
+                     val += dt * base_trans_x(i, j) * base_trans_x(k, m) / rigid_u_mass;
+                     val += dt * base_trans_y(i, j) * base_trans_y(k, m) / rigid_v_mass;
+
+                     //Rotation
+                     val += dt * base_rot_z(i, j) * base_rot_z(k, m) * Jinv;
+
+                     if (fabs(val) > 1e-10) {
+                        triplets.push_back(Eigen::Triplet<double>(i + ni*j, k + ni*m, val));
+                     }
+                  }
+               }
+            }
+
+         }
+      }
+   }
+   */
+   //Solve the system using one of Eigen's sparse solvers
+
+   Eigen::SparseMatrix<double> Ematrix(system_size, system_size);
+   Ematrix.setFromTriplets(triplets.begin(), triplets.end());
+
+
+   //replace empty rows/cols to make (at least) positive semi-definite
+   for (int row = 0; row < Ematrix.outerSize(); ++row) {
+
+      //TODO: There has to be a way to extract this count intelligently in Eigen
+      //rather than simply counting.
+      int count = 0;
+      for (Eigen::SparseMatrix<double>::InnerIterator it(Ematrix, row); it; ++it){
+         ++count;
+      }
+      if (count == 0) {
+         Ematrix.coeffRef(row, row) = 1;
+         Erhs[row] = 0;
+      }
+   }
+
+
+   //pin one pressure sample to remove the 1D null space, and make truly Positive Definite
+   //(in the case where there is no liquid surface).
+   if (!any_liquid_surface) {
+      int del_index = -1;
+      for (int j = 0; j < nj && del_index <0; ++j) for (int i = 0; i < ni && del_index <0; ++i) {
+         int index = i + ni*j;
+         float centre_phi = liquid_phi(i, j);
+         if (centre_phi < 0 && (u_weights(i + 1, j) > 0 || u_weights(i, j) > 0 || v_weights(i, j + 1) > 0 || v_weights(i, j) > 0)) {
+            del_index = index;
+            break;
+         }
+      }
+
+      //zero the RHS
+      Erhs[del_index] = 0;
+
+      //replace row/col with identity
+      for (Eigen::SparseMatrix<double>::InnerIterator it(Ematrix, del_index); it; ++it)
+      {
+         if (it.col() == it.row()) {
+            Ematrix.coeffRef(it.row(), it.col()) = 1;
+         }
+         else {
+            Ematrix.coeffRef(it.row(), it.col()) = 0;
+            Ematrix.coeffRef(it.col(), it.row()) = 0;
+         }
+      }
+   }
+   Ematrix.makeCompressed();
+
+
+   Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> Esolver;
+   Esolver.compute(Ematrix);
+   if (Esolver.info() != Eigen::Success) {
+      std::cout << "Eigen factorization failed.\n";
+      Eigen::saveMarket(Ematrix, "pressurematrix.matrix");
+      exit(0);
+   }
+   Eigen::VectorXd pressure = Esolver.solve(Erhs);
+   if (Esolver.info() != Eigen::Success) {
+      std::cout << "Eigen solve failed.\n";
+      Eigen::saveMarket(Ematrix, "pressurematrix.matrix");
+      exit(0);
+   }
+
+
+
+   //Apply the velocity update
+   u_valid.assign(0);
+   for (int j = 0; j < u.nj; ++j) for (int i = 1; i < u.ni - 1; ++i) {
+      int index = i + j*ni;
+      if (u_weights(i, j) > 0 && (liquid_phi(i, j) < 0 || liquid_phi(i - 1, j) < 0)) {
+         float theta = 1;
+         if (liquid_phi(i, j) >= 0 || liquid_phi(i - 1, j) >= 0)
+            theta = fraction_inside(liquid_phi(i - 1, j), liquid_phi(i, j));
+         if (theta < 0.01f) theta = 0.01f;
+         u(i, j) -= dt  * (float)(pressure[index] - pressure[index - 1]) / dx / theta;
+         u_valid(i, j) = 1;
+      }
+      else
+         u(i, j) = 0;
+   }
+   v_valid.assign(0);
+   for (int j = 1; j < v.nj - 1; ++j) for (int i = 0; i < v.ni; ++i) {
+      int index = i + j*ni;
+      if (v_weights(i, j) > 0 && (liquid_phi(i, j) < 0 || liquid_phi(i, j - 1) < 0)) {
+         float theta = 1;
+         if (liquid_phi(i, j) >= 0 || liquid_phi(i, j - 1) >= 0)
+            theta = fraction_inside(liquid_phi(i, j - 1), liquid_phi(i, j));
+         if (theta < 0.01f) theta = 0.01f;
+         v(i, j) -= dt  * (float)(pressure[index] - pressure[index - ni]) / dx / theta;
+         v_valid(i, j) = 1;
+      }
+      else
+         v(i, j) = 0;
+   }
+
+   //Get pressure update to apply to solid
+   Vec2f updated_rigid_linear_velocity;
+   float updated_rigid_angular_momentum;
+   rbd->getLinearVelocity(updated_rigid_linear_velocity);
+   rbd->getAngularMomentum(updated_rigid_angular_momentum);
+   for (int j = 0; j < nj; ++j) {
+      for (int i = 0; i < ni; ++i) {
+         int index = i + ni*j;
+         float centre_phi = liquid_phi(i, j);
+         if (centre_phi < 0) {
+            updated_rigid_linear_velocity[0] += (float)(dt*base_trans_x(i, j)*pressure[index] / rigid_u_mass);
+            updated_rigid_linear_velocity[1] += (float)(dt*base_trans_y(i, j)*pressure[index] / rigid_v_mass);
+
+            updated_rigid_angular_momentum += (float)(dt*base_rot_z(i, j) * pressure[index]);
+         }
+      }
+   }
+
+   rbd->setLinearVelocity(updated_rigid_linear_velocity);
+   rbd->setAngularMomentum(updated_rigid_angular_momentum);
+
+}
+
+
 int FluidSim::u_ind(int i, int j) {
    return i + j*(ni + 1);
 }
@@ -936,7 +1252,6 @@ void FluidSim::solve_viscosity(float dt) {
    const int SOLID = 1;
    const int FLUID = 0;
 
-   printf("Determining states\n");
    //just determine if the face position is inside the wall! That's it.
    for (int j = 0; j < nj; ++j) {
       for (int i = 0; i < ni + 1; ++i) {
@@ -957,7 +1272,6 @@ void FluidSim::solve_viscosity(float dt) {
       }
    }
 
-   printf("Building matrix\n");
    int elts = (ni + 1)*nj + ni*(nj + 1);
    if (vrhs.size() != elts) {
       vrhs.resize(elts);
