@@ -8,6 +8,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <vector>
+#include <cstring>
 
 // In this file:
 //   Array1<T>: a dynamic 1D array for plain-old-data (not objects)
@@ -165,11 +166,11 @@ struct Array1
    Array1<T>& operator=(const Array1<T>& x)
    {
       if(max_n<x.n){
-         T* new_data=(T*)std::malloc(x.n*sizeof(T));
-         if(!new_data) throw std::bad_alloc();
-         std::free(data);
-         data=new_data;
-         max_n=x.n;
+	 T* new_data=(T*)std::malloc(x.n*sizeof(T));
+	 if(!new_data) throw std::bad_alloc();
+	 std::free(data);
+	 data=new_data;
+	 max_n=x.n;
       }
       n=x.n;
       std::memcpy(data, x.data, n*sizeof(T));
@@ -182,7 +183,7 @@ struct Array1
       for(unsigned long i=0; i<n; ++i) if(!(data[i]==x.data[i])) return false;
       return true;
    }
- 
+
    bool operator!=(const Array1<T>& x) const
    {
       if(n!=x.n) return true;
@@ -193,8 +194,8 @@ struct Array1
    bool operator<(const Array1<T>& x) const
    {
       for(unsigned long i=0; i<n && i<x.n; ++i){
-         if(data[i]<x[i]) return true;
-         else if(x[i]<data[i]) return false;
+	 if(data[i]<x[i]) return true;
+	 else if(x[i]<data[i]) return false;
       }
       return n<x.n;
    }
@@ -202,8 +203,8 @@ struct Array1
    bool operator>(const Array1<T>& x) const
    {
       for(unsigned long i=0; i<n && i<x.n; ++i){
-         if(data[i]>x[i]) return true;
-         else if(x[i]>data[i]) return false;
+	 if(data[i]>x[i]) return true;
+	 else if(x[i]>data[i]) return false;
       }
       return n>x.n;
    }
@@ -211,8 +212,8 @@ struct Array1
    bool operator<=(const Array1<T>& x) const
    {
       for(unsigned long i=0; i<n && i<x.n; ++i){
-         if(data[i]<x[i]) return true;
-         else if(x[i]<data[i]) return false;
+	 if(data[i]<x[i]) return true;
+	 else if(x[i]<data[i]) return false;
       }
       return n<=x.n;
    }
@@ -220,8 +221,8 @@ struct Array1
    bool operator>=(const Array1<T>& x) const
    {
       for(unsigned long i=0; i<n && i<x.n; ++i){
-         if(data[i]>x[i]) return true;
-         else if(x[i]>data[i]) return false;
+	 if(data[i]>x[i]) return true;
+	 else if(x[i]>data[i]) return false;
       }
       return n>=x.n;
    }
@@ -237,7 +238,7 @@ struct Array1
    { for(unsigned long i=0; i<n; ++i) data[i]=value; }
 
    void assign(unsigned long num, const T& value)
-   { fill(num, value); } 
+   { fill(num, value); }
 
    // note: copydata may not alias this array's data, and this should not be
    // used when T is a full object (which defines its own copying operation)
@@ -245,11 +246,11 @@ struct Array1
    {
       assert(num==0 || copydata);
       if(num>max_n){
-         if(num>ULONG_MAX/sizeof(T)) throw std::bad_alloc();
-         std::free(data);
-         data=(T*)std::malloc(num*sizeof(T));
-         if(!data) throw std::bad_alloc();
-         max_n=num;
+	 if(num>ULONG_MAX/sizeof(T)) throw std::bad_alloc();
+	 std::free(data);
+	 data=(T*)std::malloc(num*sizeof(T));
+	 if(!data) throw std::bad_alloc();
+	 max_n=num;
       }
       n=num;
       std::memcpy(data, copydata, n*sizeof(T));
@@ -269,8 +270,8 @@ struct Array1
       unsigned long i=0;
       InputIterator p=first;
       for(; p!=last; ++p, ++i){
-         if(i==max_n) grow();
-         data[i]=*p;
+	 if(i==max_n) grow();
+	 data[i]=*p;
       }
       n=i;
    }
@@ -288,7 +289,7 @@ struct Array1
    }
 
    const T& back(void) const
-   { 
+   {
       assert(data && n>0);
       return data[n-1];
    }
@@ -329,18 +330,18 @@ struct Array1
    {
       assert(index<n);
       for(unsigned long i=index; i<n-1; ++i)
-         data[i]=data[i-1];
+	 data[i]=data[i-1];
       pop_back();
    }
 
    void fill(unsigned long num, const T& value)
    {
       if(num>max_n){
-         if(num>ULONG_MAX/sizeof(T)) throw std::bad_alloc();
-         std::free(data);
-         data=(T*)std::malloc(num*sizeof(T));
-         if(!data) throw std::bad_alloc();
-         max_n=num;
+	 if(num>ULONG_MAX/sizeof(T)) throw std::bad_alloc();
+	 std::free(data);
+	 data=(T*)std::malloc(num*sizeof(T));
+	 if(!data) throw std::bad_alloc();
+	 max_n=num;
       }
       n=num;
       for(unsigned long i=0; i<n; ++i) data[i]=value;
@@ -372,7 +373,7 @@ struct Array1
       assert(index<=n);
       push_back(back());
       for(unsigned long i=n-1; i>index; --i)
-         data[i]=data[i-1];
+	 data[i]=data[i-1];
       data[index]=entry;
    }
 
@@ -551,7 +552,7 @@ struct WrapArray1
       for(unsigned long i=0; i<n; ++i) if(!(data[i]==x.data[i])) return false;
       return true;
    }
- 
+
    bool operator!=(const WrapArray1<T>& x) const
    {
       if(n!=x.n) return true;
@@ -562,8 +563,8 @@ struct WrapArray1
    bool operator<(const WrapArray1<T>& x) const
    {
       for(unsigned long i=0; i<n && i<x.n; ++i){
-         if(data[i]<x[i]) return true;
-         else if(x[i]<data[i]) return false;
+	 if(data[i]<x[i]) return true;
+	 else if(x[i]<data[i]) return false;
       }
       return n<x.n;
    }
@@ -571,8 +572,8 @@ struct WrapArray1
    bool operator>(const WrapArray1<T>& x) const
    {
       for(unsigned long i=0; i<n && i<x.n; ++i){
-         if(data[i]>x[i]) return true;
-         else if(x[i]>data[i]) return false;
+	 if(data[i]>x[i]) return true;
+	 else if(x[i]>data[i]) return false;
       }
       return n>x.n;
    }
@@ -580,8 +581,8 @@ struct WrapArray1
    bool operator<=(const WrapArray1<T>& x) const
    {
       for(unsigned long i=0; i<n && i<x.n; ++i){
-         if(data[i]<x[i]) return true;
-         else if(x[i]<data[i]) return false;
+	 if(data[i]<x[i]) return true;
+	 else if(x[i]<data[i]) return false;
       }
       return n<=x.n;
    }
@@ -589,8 +590,8 @@ struct WrapArray1
    bool operator>=(const WrapArray1<T>& x) const
    {
       for(unsigned long i=0; i<n && i<x.n; ++i){
-         if(data[i]>x[i]) return true;
-         else if(x[i]>data[i]) return false;
+	 if(data[i]>x[i]) return true;
+	 else if(x[i]>data[i]) return false;
       }
       return n>=x.n;
    }
@@ -606,7 +607,7 @@ struct WrapArray1
    { for(unsigned long i=0; i<n; ++i) data[i]=value; }
 
    void assign(unsigned long num, const T& value)
-   { fill(num, value); } 
+   { fill(num, value); }
 
    // note: copydata may not alias this array's data, and this should not be
    // used when T is a full object (which defines its own copying operation)
@@ -632,8 +633,8 @@ struct WrapArray1
       unsigned long i=0;
       InputIterator p=first;
       for(; p!=last; ++p, ++i){
-         assert(i<max_n);
-         data[i]=*p;
+	 assert(i<max_n);
+	 data[i]=*p;
       }
       n=i;
    }
@@ -651,7 +652,7 @@ struct WrapArray1
    }
 
    const T& back(void) const
-   { 
+   {
       assert(data && n>0);
       return data[n-1];
    }
@@ -687,7 +688,7 @@ struct WrapArray1
    {
       assert(index<n);
       for(unsigned long i=index; i<n-1; ++i)
-         data[i]=data[i-1];
+	 data[i]=data[i-1];
       pop_back();
    }
 
@@ -715,7 +716,7 @@ struct WrapArray1
       assert(index<=n);
       push_back(back());
       for(unsigned long i=n-1; i>index; --i)
-         data[i]=data[i-1];
+	 data[i]=data[i-1];
       data[index]=entry;
    }
 
