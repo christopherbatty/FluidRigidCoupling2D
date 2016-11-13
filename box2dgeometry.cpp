@@ -1,6 +1,7 @@
 #include "box2dgeometry.h"
 #include <vector>
 #include "util.h"
+#include <cstdio>
 
 //check if a point in the object's frame of reference is inside or not
 bool Box2DGeometry::is_inside(const Vec2f& point) {
@@ -42,7 +43,7 @@ float Box2DGeometry::get_signed_distance(const Vec2f& point) {
 
 void Box2DGeometry::project_out(Vec2f& point) {
    //Project point to the closest boundary
-   
+
    if(is_inside(point)) {
       const float leftDist = point[0] + width/2;
       const float rightDist = width/2 - point[0];
@@ -50,15 +51,15 @@ void Box2DGeometry::project_out(Vec2f& point) {
       const float topDist = height/2 - point[1];
 
       if ((bottomDist<=rightDist) && (bottomDist<=leftDist) && (bottomDist<=topDist))
-         point[1] = -height/2;
+	 point[1] = -height/2;
       else if ((rightDist<=leftDist) && (rightDist<=bottomDist) && (rightDist<=topDist))
-         point[0] = width/2;
+	 point[0] = width/2;
       else if ((leftDist<=rightDist) && (leftDist<=bottomDist) && (leftDist<=topDist))
-         point[0] = -width/2;
+	 point[0] = -width/2;
       else if ((topDist<=leftDist) && (topDist<=bottomDist) && (topDist<=rightDist))
-         point[1] = height/2;
+	 point[1] = height/2;
    }
-   
+
 }
 
 void Box2DGeometry::get_sample_points(std::vector<Vec2f>& verts) {
@@ -73,10 +74,10 @@ void Box2DGeometry::get_sample_points(std::vector<Vec2f>& verts) {
       verts.push_back( point2 );
 
       if(i != 0 && i != divisions) {
-         Vec2f point3(-width/2,-height/2 + i*dh);
-         Vec2f point4(width/2,-height/2 + i*dh);
-         verts.push_back( point3 );
-         verts.push_back( point4 );
+	 Vec2f point3(-width/2,-height/2 + i*dh);
+	 Vec2f point4(width/2,-height/2 + i*dh);
+	 verts.push_back( point3 );
+	 verts.push_back( point4 );
       }
    }
 }

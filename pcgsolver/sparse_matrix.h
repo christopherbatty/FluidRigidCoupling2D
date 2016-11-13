@@ -3,7 +3,7 @@
 
 #include <iostream>
 #include <vector>
-#include "util.h"
+#include "../util.h"
 
 //============================================================================
 // Dynamic compressed sparse row matrix.
@@ -19,8 +19,8 @@ struct SparseMatrix
       : n(n_), index(n_), value(n_)
    {
       for(unsigned int i=0; i<n; ++i){
-         index[i].reserve(expected_nonzeros_per_row);
-         value[i].reserve(expected_nonzeros_per_row);
+	 index[i].reserve(expected_nonzeros_per_row);
+	 value[i].reserve(expected_nonzeros_per_row);
       }
    }
 
@@ -34,8 +34,8 @@ struct SparseMatrix
    void zero(void)
    {
       for(unsigned int i=0; i<n; ++i){
-         index[i].resize(0);
-         value[i].resize(0);
+	 index[i].resize(0);
+	 value[i].resize(0);
       }
    }
 
@@ -49,8 +49,8 @@ struct SparseMatrix
    T operator()(unsigned int i, unsigned int j) const
    {
       for(unsigned int k=0; k<index[i].size(); ++k){
-         if(index[i][k]==j) return value[i][k];
-         else if(index[i][k]>j) return 0;
+	 if(index[i][k]==j) return value[i][k];
+	 else if(index[i][k]>j) return 0;
       }
       return 0;
    }
@@ -59,14 +59,14 @@ struct SparseMatrix
    {
       unsigned int k=0;
       for(; k<index[i].size(); ++k){
-         if(index[i][k]==j){
-            value[i][k]=new_value;
-            return;
-         }else if(index[i][k]>j){
-            insert(index[i], k, j);
-            insert(value[i], k, new_value);
-            return;
-         }
+	 if(index[i][k]==j){
+	    value[i][k]=new_value;
+	    return;
+	 }else if(index[i][k]>j){
+	    insert(index[i], k, j);
+	    insert(value[i], k, new_value);
+	    return;
+	 }
       }
       index[i].push_back(j);
       value[i].push_back(new_value);
@@ -76,14 +76,14 @@ struct SparseMatrix
    {
       unsigned int k=0;
       for(; k<index[i].size(); ++k){
-         if(index[i][k]==j){
-            value[i][k]+=increment_value;
-            return;
-         }else if(index[i][k]>j){
-            insert(index[i], k, j);
-            insert(value[i], k, increment_value);
-            return;
-         }
+	 if(index[i][k]==j){
+	    value[i][k]+=increment_value;
+	    return;
+	 }else if(index[i][k]>j){
+	    insert(index[i], k, j);
+	    insert(value[i], k, increment_value);
+	    return;
+	 }
       }
       index[i].push_back(j);
       value[i].push_back(increment_value);
@@ -94,21 +94,21 @@ struct SparseMatrix
    {
       unsigned int j=0, k=0;
       while(j<indices.size() && k<index[i].size()){
-         if(index[i][k]<indices[j]){
-            ++k;
-         }else if(index[i][k]>indices[j]){
-            insert(index[i], k, indices[j]);
-            insert(value[i], k, values[j]);
-            ++j;
-         }else{
-            value[i][k]+=values[j];
-            ++j;
-            ++k;
-         }
+	 if(index[i][k]<indices[j]){
+	    ++k;
+	 }else if(index[i][k]>indices[j]){
+	    insert(index[i], k, indices[j]);
+	    insert(value[i], k, values[j]);
+	    ++j;
+	 }else{
+	    value[i][k]+=values[j];
+	    ++j;
+	    ++k;
+	 }
       }
       for(;j<indices.size(); ++j){
-         index[i].push_back(indices[j]);
-         value[i].push_back(values[j]);
+	 index[i].push_back(indices[j]);
+	 value[i].push_back(values[j]);
       }
    }
 
@@ -116,14 +116,14 @@ struct SparseMatrix
    void symmetric_remove_row_and_column(unsigned int i)
    {
       for(unsigned int a=0; a<index[i].size(); ++a){
-         unsigned int j=index[i][a]; // 
-         for(unsigned int b=0; b<index[j].size(); ++b){
-            if(index[j][b]==i){
-               erase(index[j], b);
-               erase(value[j], b);
-               break;
-            }
-         }
+	 unsigned int j=index[i][a]; //
+	 for(unsigned int b=0; b<index[j].size(); ++b){
+	    if(index[j][b]==i){
+	       erase(index[j], b);
+	       erase(value[j], b);
+	       break;
+	    }
+	 }
       }
       index[i].resize(0);
       value[i].resize(0);
@@ -133,21 +133,21 @@ struct SparseMatrix
    {
       output<<variable_name<<"=sparse([";
       for(unsigned int i=0; i<n; ++i){
-         for(unsigned int j=0; j<index[i].size(); ++j){
-            output<<i+1<<" ";
-         }
+	 for(unsigned int j=0; j<index[i].size(); ++j){
+	    output<<i+1<<" ";
+	 }
       }
       output<<"],...\n  [";
       for(unsigned int i=0; i<n; ++i){
-         for(unsigned int j=0; j<index[i].size(); ++j){
-            output<<index[i][j]+1<<" ";
-         }
+	 for(unsigned int j=0; j<index[i].size(); ++j){
+	    output<<index[i][j]+1<<" ";
+	 }
       }
       output<<"],...\n  [";
       for(unsigned int i=0; i<n; ++i){
-         for(unsigned int j=0; j<value[i].size(); ++j){
-            output<<value[i][j]<<" ";
-         }
+	 for(unsigned int j=0; j<value[i].size(); ++j){
+	    output<<value[i][j]<<" ";
+	 }
       }
       output<<"], "<<n<<", "<<n<<");"<<std::endl;
    }
@@ -165,7 +165,7 @@ void multiply(const SparseMatrix<T> &matrix, const std::vector<T> &x, std::vecto
    for(unsigned int i=0; i<matrix.n; ++i){
       result[i]=0;
       for(unsigned int j=0; j<matrix.index[i].size(); ++j){
-         result[i]+=matrix.value[i][j]*x[matrix.index[i][j]];
+	 result[i]+=matrix.value[i][j]*x[matrix.index[i][j]];
       }
    }
 }
@@ -178,7 +178,7 @@ void multiply_and_subtract(const SparseMatrix<T> &matrix, const std::vector<T> &
    result.resize(matrix.n);
    for(unsigned int i=0; i<matrix.n; ++i){
       for(unsigned int j=0; j<matrix.index[i].size(); ++j){
-         result[i]-=matrix.value[i][j]*x[matrix.index[i][j]];
+	 result[i]-=matrix.value[i][j]*x[matrix.index[i][j]];
       }
    }
 }
@@ -219,17 +219,17 @@ struct FixedSparseMatrix
       resize(matrix.n);
       rowstart[0]=0;
       for(unsigned int i=0; i<n; ++i){
-         rowstart[i+1]=rowstart[i]+(unsigned int)matrix.index[i].size();
+	 rowstart[i+1]=rowstart[i]+(unsigned int)matrix.index[i].size();
       }
       value.resize(rowstart[n]);
       colindex.resize(rowstart[n]);
       unsigned int j=0;
       for(unsigned int i=0; i<n; ++i){
-         for(unsigned int k=0; k<matrix.index[i].size(); ++k){
-            value[j]=matrix.value[i][k];
-            colindex[j]=matrix.index[i][k];
-            ++j;
-         }
+	 for(unsigned int k=0; k<matrix.index[i].size(); ++k){
+	    value[j]=matrix.value[i][k];
+	    colindex[j]=matrix.index[i][k];
+	    ++j;
+	 }
       }
    }
 
@@ -237,21 +237,21 @@ struct FixedSparseMatrix
    {
       output<<variable_name<<"=sparse([";
       for(unsigned int i=0; i<n; ++i){
-         for(unsigned int j=rowstart[i]; j<rowstart[i+1]; ++j){
-            output<<i+1<<" ";
-         }
+	 for(unsigned int j=rowstart[i]; j<rowstart[i+1]; ++j){
+	    output<<i+1<<" ";
+	 }
       }
       output<<"],...\n  [";
       for(unsigned int i=0; i<n; ++i){
-         for(unsigned int j=rowstart[i]; j<rowstart[i+1]; ++j){
-            output<<colindex[j]+1<<" ";
-         }
+	 for(unsigned int j=rowstart[i]; j<rowstart[i+1]; ++j){
+	    output<<colindex[j]+1<<" ";
+	 }
       }
       output<<"],...\n  [";
       for(unsigned int i=0; i<n; ++i){
-         for(unsigned int j=rowstart[i]; j<rowstart[i+1]; ++j){
-            output<<value[j]<<" ";
-         }
+	 for(unsigned int j=rowstart[i]; j<rowstart[i+1]; ++j){
+	    output<<value[j]<<" ";
+	 }
       }
       output<<"], "<<n<<", "<<n<<");"<<std::endl;
    }
@@ -269,7 +269,7 @@ void multiply(const FixedSparseMatrix<T> &matrix, const std::vector<T> &x, std::
    for(unsigned int i=0; i<matrix.n; ++i){
       result[i]=0;
       for(unsigned int j=matrix.rowstart[i]; j<matrix.rowstart[i+1]; ++j){
-         result[i]+=matrix.value[j]*x[matrix.colindex[j]];
+	 result[i]+=matrix.value[j]*x[matrix.colindex[j]];
       }
    }
 }
@@ -282,7 +282,7 @@ void multiply_and_subtract(const FixedSparseMatrix<T> &matrix, const std::vector
    result.resize(matrix.n);
    for(unsigned int i=0; i<matrix.n; ++i){
       for(unsigned int j=matrix.rowstart[i]; j<matrix.rowstart[i+1]; ++j){
-         result[i]-=matrix.value[j]*x[matrix.colindex[j]];
+	 result[i]-=matrix.value[j]*x[matrix.colindex[j]];
       }
    }
 }

@@ -1,7 +1,8 @@
 #ifndef MAT_H
 #define MAT_H
- 
+
 #include "vec.h"
+#include <cstring>
 
 template<unsigned int M, unsigned int N, class T>
 struct Mat
@@ -125,12 +126,12 @@ struct Mat
       const T *pa, *pv;
       T s, *pr=r.v;
       for(i=0; i<M; ++i, ++pr){
-         pa=a+i;
-         pv=v.v;
-         s=0;
-         for(j=0; j<N; ++j, pa+=M, ++pv)
-            s+=*pa*(*pv);
-         *pr=s;
+	 pa=a+i;
+	 pv=v.v;
+	 s=0;
+	 for(j=0; j<N; ++j, pa+=M, ++pv)
+	    s+=*pa*(*pv);
+	 *pr=s;
       }
 	  return r;
    }
@@ -143,14 +144,14 @@ struct Mat
       const T *pa, *pb;
       T s, *pc=c.a;
       for(k=0; k<P; ++k){
-         for(i=0; i<M; ++i, ++pc){
-            pa=a+i;
-            pb=b.a+N*k;
-            s=0;
-            for(j=0; j<N; ++j, pa+=M, ++pb)
-               s+=*pa*(*pb);
-            *pc=s;
-         }
+	 for(i=0; i<M; ++i, ++pc){
+	    pa=a+i;
+	    pb=b.a+N*k;
+	    s=0;
+	    for(j=0; j<N; ++j, pa+=M, ++pb)
+	       s+=*pa*(*pb);
+	    *pc=s;
+	 }
       }
 	  return c;
    }
@@ -170,11 +171,11 @@ struct Mat
 
    Mat<N,M,T> transpose() const {
       Mat<N,M,T> result;
-      
+
       for(unsigned int i = 0; i < M; ++i) {
-         for(unsigned int j = 0; j < N; ++j) {
-            result(j,i) = (*this)(i,j);
-         }
+	 for(unsigned int j = 0; j < N; ++j) {
+	    result(j,i) = (*this)(i,j);
+	 }
       }
       return result;
    }
@@ -203,7 +204,7 @@ std::ostream &operator<<(std::ostream &out, const Mat<M,N,T> &a)
    for(unsigned int i=0; i<M; ++i){
       out<<(i==0 ? '[' : ' ');
       for(unsigned int j=0; j<N-1; ++j)
-         out<<a(i,j)<<',';
+	 out<<a(i,j)<<',';
       out<<a(i,N-1);
       if(i<M-1) out<<';'<<std::endl;
       else out<<']';
@@ -226,7 +227,7 @@ inline Mat<M,N,T> outer(const Vec<M,T> &x, const Vec<N,T> &y)
    T *pr=r.a;
    for(unsigned int j=0; j<N; ++j)
       for(unsigned int i=0; i<M; ++i, ++pr)
-         *pr=x[i]*y[j];
+	 *pr=x[i]*y[j];
    return r;
 }
 
@@ -248,8 +249,8 @@ template<class T>
 inline Mat<3,3,T> star_matrix(const Vec<3,T> &w)
 {
    return Mat<3,3,T>(0, -w.v[2], w.v[1],
-                     w.v[2], 0, -w.v[0],
-                     -w.v[1], w.v[0], 0);
+		     w.v[2], 0, -w.v[0],
+		     -w.v[1], w.v[0], 0);
 }
 
 #endif
