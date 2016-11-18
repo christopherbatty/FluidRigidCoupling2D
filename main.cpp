@@ -27,8 +27,8 @@ bool draw_rbd = true;
 
 float grid_width = 1;
 
-bool indefinite_form = false; //True - Batty '07 linear system: SPD, but with dense chunks
-                              //False - Same numerics, but Robinson-Mosher '08 linear system: fully sparse, but symmetric indefinite.
+bool indefinite_form = false; //False - Batty '07 linear system: SPD, but with dense chunks
+                              //True - Same numerics, but Robinson-Mosher '08 linear system: fully sparse, but symmetric indefinite.
 
 //both forms use finite volume face area weights as in Ng et al. 2009 (rather than volume fractions as in Batty '07).
 
